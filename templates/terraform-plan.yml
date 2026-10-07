@@ -1,0 +1,43 @@
+parameters:
+  - name: environment
+    type: string
+  - name: workingDir
+    type: string
+  - name: serviceConnection
+    type: string
+  - name: storageAccount
+    type: string
+  - name: containerName
+    type: string
+  - name: stateKey
+    type: string
+
+
+
+stages:
+  - stage: tfPlan
+    displayName: tfPlan
+    dependsOn: tfValidate
+    condition: succeeded()
+    jobs:
+      - job: tfPlan
+        displayName: terraformPlan
+        steps:
+        - task: TerraformTask@5
+          displayName: Terraform init
+          inputs:
+            provider: 'azurerm'
+            command: 'init'
+            workingDirectory: '$(workingDir)/environments/${{parameters.environment}}'
+            backendServiceArm: '$(serviceConnection)'
+            backendAzureRmStorageAccountName: '$(storageAccount)'
+            backendAzureRmContainerName: '$(containerName)'
+            backendAzureRmKey: '${{parameters.environment}}.tfstate'
+
+        - task: TerraformTask@5
+          displayName: Terraform Plan
+          inputs:
+            provider: 'azurerm'
+            command: 'plan'
+            workingDirectory: '$(workingDir)/environments/${{parameters.environment}}'
+            environmentServiceNameAzureRM: '$(serviceConnection)'

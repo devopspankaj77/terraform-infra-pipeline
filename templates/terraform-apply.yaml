@@ -1,0 +1,37 @@
+parameters:
+  - name: environment
+    type: string
+  - name: workingDir
+  - name: serviceConnection
+  - name: storageAccount
+  - name: containerName
+  
+
+
+
+
+stages:
+  - stage: tfApply
+    displayName: Terraform Apply
+    dependsOn: manualApproval
+    condition: succeeded()
+    jobs:
+      - job: tfApply
+        displayName: tfApply
+        steps:
+        - task: TerraformTask@5
+          displayName: Terraform init
+          inputs:
+            provider: 'azurerm'
+            command: 'init'
+            workingDirectory: '$(workingDir)/environments/${{parameters.environment}}'
+            backendServiceArm: '$(serviceConnection)'
+            backendAzureRmStorageAccountName: '$(storageAccount)'
+            backendAzureRmContainerName: '$(containerName)'
+            backendAzureRmKey: '${{parameters.environment}}.tfstate'
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'apply'
+            workingDirectory: '$(workingDir)/environments/${{ parameters.environment }}'
+            environmentServiceNameAzureRM: 'myvisit-ado'

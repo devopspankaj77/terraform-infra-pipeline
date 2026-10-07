@@ -1,0 +1,79 @@
+pool: sandeep
+trigger: none
+
+parameters:
+- name: environment
+  displayName: envName
+  type: string
+  default: dev
+  values: 
+    - dev
+    - qa
+    - prod
+
+variables:
+  workingDir: '$(System.DefaultWorkingDirectory)'
+  serviceConnection: 'myvisit-ado'
+  storageAccount: 'stgtfstatesandeep1'
+  containerName: 'tfstate'
+  stateKey: 'terraform.tfstate'
+
+stages:
+  - template: templates/terraform-validate.yml
+    parameters:
+      environment: ${{ parameters.environment }}
+      workingDir: $(workingDir)
+      serviceConnection: $(serviceConnection)
+      storageAccount: $(storageAccount)
+      containerName: $(containerName)
+      stateKey: $(stateKey)
+  - template: templates/terraform-security.yml
+    parameters:
+      environment: ${{ parameters.environment }}
+      workingDir: $(workingDir)
+      
+  - template: templates/terraform-plan.yml
+    parameters:
+      environment: ${{ parameters.environment }}
+      workingDir: $(workingDir)
+      serviceConnection: $(serviceConnection)
+      storageAccount: $(storageAccount)
+      containerName: $(containerName)
+      stateKey: $(stateKey)
+
+  - stage: manualApproval
+    jobs:
+      - job: manualApproval
+        displayName: manualApproval
+        pool: server
+        steps:
+        - task: ManualValidation@1
+          inputs:
+            notifyUsers: 'pankaj.tiwari.devops@gmail.com'
+            instructions: 'please approve'
+
+
+  - stage: tfApply
+    displayName: Terraform Apply
+    dependsOn: manualApproval
+    condition: succeeded()
+    jobs:
+      - job: tfApply
+        displayName: tfApply
+        steps:
+        - task: TerraformTask@5
+          displayName: Terraform init
+          inputs:
+            provider: 'azurerm'
+            command: 'init'
+            workingDirectory: '$(workingDir)/environments/${{parameters.environment}}'
+            backendServiceArm: '$(serviceConnection)'
+            backendAzureRmStorageAccountName: '$(storageAccount)'
+            backendAzureRmContainerName: '$(containerName)'
+            backendAzureRmKey: '$(stateKey)'
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'apply'
+            workingDirectory: '$(workingDir)/environments/${{ parameters.environment }}'
+            environmentServiceNameAzureRM: 'myvisit-ado'

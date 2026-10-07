@@ -1,0 +1,58 @@
+parameters:
+  - name: environment
+    type: string
+  - name: workingDir
+    type: string
+    
+
+
+stages:
+  - stage: tfSecurityScan
+    displayName: tfSecurityScan
+    jobs:
+      - job: tfSecurityScan
+        displayName: tfSecurityScan
+        steps:
+        - task: trivy@2
+          displayName: trivyScanning
+          inputs:
+            version: 'latest'
+            type: 'filesystem'
+            target: '$(workingDir)'
+            scanners: 'license, misconfig, secret, vuln'
+            severities: 'MEDIUM, HIGH, CRITICAL'
+            reports: 'sarif, table'
+            publish: true
+
+        # - task: tfsec@1
+        #   inputs:
+        #     version: 'v1.26.0'
+        #     dir: '$(System.DefaultWorkingDirectory)'
+        - task: Gitleaks@3
+          displayName: Terraform Gitleaks scanning
+          inputs:
+            scanlocation: '$(workingDir)'
+            configtype: 'default'
+            reportformat: 'sarif'
+
+        - task: CmdLine@2
+          displayName: TFLint Security Scanning
+          inputs:
+            script: |
+              set -e
+
+              if ! command -v tflint >/dev/null 2>&1; then
+                echo "Installing TFLint..."
+
+                cd /tmp
+                curl -sSLO https://github.com/terraform-linters/tflint/releases/latest/download/tflint_linux_amd64.zip
+                unzip -o tflint_linux_amd64.zip
+                sudo install -c -v tflint /usr/local/bin/tflint
+              fi
+
+              tflint --version
+
+              cd "$(Build.SourcesDirectory)"
+
+              tflint --init
+              tflint
